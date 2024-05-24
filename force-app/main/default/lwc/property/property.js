@@ -1,14 +1,17 @@
-import { LightningElement, wire} from 'lwc';
+import { LightningElement, wire } from 'lwc';
 import getPropertyItems from '@salesforce/apex/PropertyController.getPropertyItems';
 import searchPropertyItems from '@salesforce/apex/PropertyController.searchPropertyItems';
+import deleteProperty from '@salesforce/apex/PropertyController.deleteProperty';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import { refreshApex } from '@salesforce/apex';
 
+// birthday
 export default class Property extends LightningElement {
     propertyItems;
     error;
     loading = false;
     showModal = false;
-    showEditModal = false;
+    showDeleteModal = false;
     currentPropertyId;
     searchTerm = '';
     selectedFilters = {
@@ -16,10 +19,20 @@ export default class Property extends LightningElement {
         Medium: false,
         Large: false
     };
+    isEditing = false;
+
+    wiredPropertyItemsResult;
 
     @wire(getPropertyItems)
-    wiredPropertyItems({ error, data }) {
-        this.extractData(error, data);
+    wiredPropertyItems(result) {
+        this.wiredPropertyItemsResult = result;
+        if (result.data) {
+            this.propertyItems = result.data;
+            this.error = undefined;
+        } else if (result.error) {
+            this.error = result.error;
+            this.propertyItems = undefined;
+        }
     }
 
     handleInputChange(event) {
@@ -54,7 +67,8 @@ export default class Property extends LightningElement {
         const filters = Object.keys(this.selectedFilters).filter(key => this.selectedFilters[key]);
         searchPropertyItems({ searchKeywords: this.searchTerm, filters: filters })
             .then(result => {
-                this.extractData(undefined, result);
+                this.propertyItems = result;
+                this.error = undefined;
             })
             .catch(error => {
                 this.error = error;
@@ -65,40 +79,26 @@ export default class Property extends LightningElement {
             });
     }
 
-    extractData(error, data) {
-        if (data) {
-            this.propertyItems = data;
-            this.error = undefined;
-        } else if (error) {
-            this.error = error;
-            this.propertyItems = undefined;
-        }
-    }
-
     handleAddProperty() {
+        this.isEditing = false;
         this.showModal = true;
+        this.currentPropertyId = null;
     }
 
     handleModalClose() {
         this.showModal = false;
-        this.showEditModal = false;
     }
 
     handleSubmit(event) {
         event.preventDefault();
         const fields = event.detail.fields;
-        if (!fields.Name || !fields.Description__c || !fields.Price__c || !fields.Image__c || !fields.PropertyType__c) {
-            this.showToast('Error', 'Please fill in all required fields', 'error');
-        } else {
-            this.template.querySelector('lightning-record-edit-form').submit(fields);
-        }
+        this.template.querySelector('lightning-record-edit-form').submit(fields);
     }
 
     handleSuccess() {
         this.showModal = false;
-        this.showEditModal = false;
         this.showToast('Success', 'Property saved successfully', 'success');
-        this.refreshPropertyList();
+        return refreshApex(this.wiredPropertyItemsResult);
     }
 
     handleError() {
@@ -114,33 +114,53 @@ export default class Property extends LightningElement {
         this.dispatchEvent(event);
     }
 
-    refreshPropertyList() {
+    handleEditProperty(event) {
+        this.isEditing = true;
+        this.currentPropertyId = event.target.dataset.id;
+        this.showModal = true;
+    }
+
+    handleDeleteProperty(event) {
+        this.currentPropertyId = event.target.dataset.id;
+        this.showDeleteModal = true;
+    }
+
+    handleDeleteModalClose() {
+        this.showDeleteModal = false;
+        this.currentPropertyId = null;
+    }
+
+    confirmDeleteProperty() {
         this.loading = true;
-        getPropertyItems()
-            .then(result => {
-                this.extractData(undefined, result);
+        deleteProperty({ propertyId: this.currentPropertyId })
+            .then(() => {
+                this.showToast('Success', 'Property deleted successfully', 'success');
+                return refreshApex(this.wiredPropertyItemsResult);
             })
             .catch(error => {
-                this.error = error;
-                this.propertyItems = undefined;
+                this.showToast('Error', 'Error deleting property', 'error');
             })
             .finally(() => {
                 this.loading = false;
+                this.showDeleteModal = false;
             });
     }
 
-    handleEditProperty(event) {
-        this.currentPropertyId = event.target.dataset.id;
-        this.showEditModal = true;
-    }
+    /*
+      Returns the title of the modal based on whether we are editing an existing
+      property or creating a new one.
+      @returns {string} The title of the modal
+     */
+     get modalTitle() {
+         return this.isEditing ? 'Edit Property' : 'Add New Property';
+     }
 
-    handleEditSubmit(event) {
-        event.preventDefault();
-        const fields = event.detail.fields;
-        this.template.querySelector('lightning-record-edit-form').submit(fields);
-    }
-
-    handleCancelEdit() {
-        this.showEditModal = false;
-    }
+    /*
+      Returns the label to display on the submit button based on whether we are
+      editing an existing property or creating a new one.
+      @returns {string} the label to display on the submit button
+     */
+     get submitButtonLabel() {
+         return this.isEditing ? 'Save' : 'Add';
+     }
 }
