@@ -2,68 +2,79 @@
   @description       : 
   @author            : ChangeMeIn@UserSettingsUnder.SFDoc
   @group             : 
-  @last modified on  : 05-24-2024
+  @last modified on  : 05-30-2024
   @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
 -->
 
-<!-- birthday -->
 <template>
+   
     <lightning-card title="Property Management">
-        <!-- Filters Section -->
-        <div class="slds-m-around_medium">
-            <lightning-input 
-                label="Search" 
-                type="text" 
-                value={searchTerm} 
-                onchange={handleInputChange} 
-                class="slds-m-bottom_small">
-            </lightning-input>
-            <div class="slds-m-top_small slds-grid slds-wrap">
+            <div class="slds-grid slds-wrap">
+                <div class="slds-col slds-size_1-of-2">
                 <lightning-input 
-                    class="slds-p-horizontal_small slds-m-bottom_small" 
-                    type="checkbox" 
-                    label="Small" 
-                    value="Small" 
-                    checked={selectedFilters.Small} 
-                    onchange={handleFilterChange}>
-                </lightning-input>
-                <lightning-input 
-                    class="slds-p-horizontal_small slds-m-bottom_small" 
-                    type="checkbox" 
-                    label="Medium" 
-                    value="Medium" 
-                    checked={selectedFilters.Medium} 
-                    onchange={handleFilterChange}>
-                </lightning-input>
-                <lightning-input 
-                    class="slds-p-horizontal_small slds-m-bottom_small" 
-                    type="checkbox" 
-                    label="Large" 
-                    value="Large" 
-                    checked={selectedFilters.Large} 
-                    onchange={handleFilterChange}>
-                </lightning-input>
-            </div>
-            <div class="slds-m-top_medium slds-grid slds-wrap">
-                <lightning-button 
-                    class="slds-m-right_small slds-m-bottom_small" 
                     label="Search" 
-                    onclick={handleSearch}>
-                </lightning-button>
-                <lightning-button 
-                    class="slds-m-right_small slds-m-bottom_small" 
-                    label="Clear Filters" 
-                    onclick={clearFilter}>
-                </lightning-button>
-                <lightning-button 
-                    class="slds-m-bottom_small" 
-                    label="Add Property" 
-                    onclick={handleAddProperty}>
-                </lightning-button>
+                    type="text" 
+                    value={searchTerm} 
+                    onchange={handleInputChange} 
+                    class="slds-m-bottom_small">
+                </lightning-input>
+                <div class="slds-m-top_small slds-grid slds-wrap">
+                    <lightning-input 
+                        class="slds-p-horizontal_small slds-m-bottom_small" 
+                        type="checkbox" 
+                        label="Small" 
+                        value="Small" 
+                        checked={selectedFilters.Small} 
+                        onchange={handleFilterChange}>
+                    </lightning-input>
+                    <lightning-input 
+                        class="slds-p-horizontal_small slds-m-bottom_small" 
+                        type="checkbox" 
+                        label="Medium" 
+                        value="Medium" 
+                        checked={selectedFilters.Medium} 
+                        onchange={handleFilterChange}>
+                    </lightning-input>
+                    <lightning-input 
+                        class="slds-p-horizontal_small slds-m-bottom_small" 
+                        type="checkbox" 
+                        label="Large" 
+                        value="Large" 
+                        checked={selectedFilters.Large} 
+                        onchange={handleFilterChange}>
+                    </lightning-input>
+                </div>
+                <div class="slds-m-top_medium slds-grid slds-wrap">
+                    <lightning-button 
+                        class="slds-m-right_small slds-m-bottom_small" 
+                        label="Search" 
+                        onclick={handleSearch}>
+                    </lightning-button>
+                    <lightning-button 
+                        class="slds-m-right_small slds-m-bottom_small" 
+                        label="Clear Filters" 
+                        onclick={clearFilter}>
+                    </lightning-button>
+                    <lightning-button 
+                        class="slds-m-bottom_small" 
+                        label="Add Property" 
+                        onclick={handleAddProperty}>
+                    </lightning-button>
+                </div>
+                <lightning-slider
+                    label="Price Range"
+                    value={priceRange}
+                    min="20000"
+                    max={maxPrice}
+                    step="500"
+                    onchange={handlePriceChange}>
+                </lightning-slider>
+            </div>
+                <div class="slds-col slds-size_1-of-2">
+                <canvas id="propertyChart" width="200" height="100"></canvas>
             </div>
         </div>
-
-        <!-- Property List Section -->
+        
         <div class="slds-m-around_medium">
             <template if:true={propertyItems}>
                 <div class="slds-grid slds-wrap slds-gutters">
@@ -75,7 +86,7 @@
                                         <img src={property.Image__c} alt={property.Name} class="property-image" style="max-width:100%; max-height:200px;">
                                     </div>
                                     <p class="slds-m-top_small"><b>Description:</b> {property.Description__c}</p>
-                                    <p><b>Price:</b> <lightning-formatted-number value={property.Price__c} format-style="currency" currency-code="USD"></lightning-formatted-number></p>
+                                    <p><b>Price:</b> <lightning-formatted-number value={property.Price__c} format-style="currency" currency-code="INR"></lightning-formatted-number></p>
                                     <p><b>Property Type:</b> {property.PropertyType__c}</p>
                                     <div class="slds-m-top_medium slds-text-align_center">
                                         <lightning-button 
@@ -109,7 +120,6 @@
         </div>
     </lightning-card>
 
-    <!-- Add/Edit Property Modal -->
     <template if:true={showModal}>
         <div class="slds-backdrop slds-backdrop_open"></div>
         <section role="dialog" tabindex="-1" aria-labelledby="modal-heading-01" aria-modal="true" aria-describedby="modal-content-id-1" class="slds-modal slds-fade-in-open">
@@ -127,7 +137,6 @@
                         record-id={currentPropertyId}
                         onsuccess={handleSuccess}
                         onerror={handleError}>
-                        <!-- <lightning-messages></lightning-messages> -->
                         <lightning-input-field field-name="Name"></lightning-input-field>
                         <lightning-input-field field-name="Description__c"></lightning-input-field>
                         <lightning-input-field field-name="Price__c"></lightning-input-field>
@@ -143,7 +152,6 @@
         </section>
     </template>
 
-    <!-- Delete Confirmation Modal -->
     <template if:true={showDeleteModal}>
         <div class="slds-backdrop slds-backdrop_open"></div>
         <section role="dialog" tabindex="-1" aria-labelledby="delete-modal-heading" aria-modal="true" aria-describedby="delete-modal-content" class="slds-modal slds-fade-in-open">

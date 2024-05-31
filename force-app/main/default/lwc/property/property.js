@@ -4,9 +4,14 @@ import searchPropertyItems from '@salesforce/apex/PropertyController.searchPrope
 import deleteProperty from '@salesforce/apex/PropertyController.deleteProperty';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { refreshApex } from '@salesforce/apex';
+import { loadScript } from 'lightning/platformResourceLoader';
+import CHARTJS from '@salesforce/resourceUrl/chartjs';
+
 
 export default class Property extends LightningElement {
-    // Properties
+
+    priceRange = 0; // Tracks the selected price range
+    maxPrice = 99999; // Maximum price value (adjust according to your data)
     propertyItems; // Stores the list of property items
     error; // Stores any errors that occur during data retrieval
     loading = false; // Indicates if data is currently being loaded
@@ -21,6 +26,7 @@ export default class Property extends LightningElement {
     };
     isEditing = false; // Indicates whether the modal is in edit mode or add mode
     wiredPropertyItemsResult; // Stores the result of the @wire getPropertyItems call
+    chart; // Stores the Chart.js instance
 
     // Wire service to retrieve property items
     @wire(getPropertyItems)
@@ -29,11 +35,80 @@ export default class Property extends LightningElement {
         if (result.data) {
             this.propertyItems = result.data;
             this.error = undefined;
+            this.generatePropertyTypeChart();
         } else if (result.error) {
             this.error = result.error;
             this.propertyItems = undefined;
         }
     }
+
+    // Load Chart.js library from static resource
+    connectedCallback() {
+        Promise.all([
+            loadScript(this, CHARTJS)
+        ]).then(() => {
+            this.generatePropertyTypeChart();
+        }).catch(error => {
+            this.error = error;
+        });
+    }
+
+    // Generates the property type chart
+  generatePropertyTypeChart() {
+    let propertyTypeCounts = {
+        Small: 0,
+        Medium: 0,
+        Large: 0
+    };
+
+    if (this.propertyItems) {
+        this.propertyItems.forEach(property => {
+            propertyTypeCounts[property.PropertyType__c]++;
+        });
+    }
+
+    // Destroy the existing chart if it exists
+    if (this.chart) {
+        this.chart.destroy();
+    }
+
+    const ctx = this.template.querySelector('canvas').getContext('2d');
+    this.chart = new window.Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(propertyTypeCounts),
+            datasets: [{
+                label: 'Property Type',
+                data: Object.values(propertyTypeCounts),
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.2)',
+                    'rgba(54, 162, 235, 0.2)',
+                    'rgba(255, 206, 86, 0.2)',
+                ],
+                borderColor: [
+                    'rgba(255, 99, 132, 1)',
+                    'rgba(54, 162, 235, 1)',
+                    'rgba(255, 206, 86, 1)',
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                yAxes: [{
+                    ticks: {
+                        beginAtZero: true,
+                        precision: 0 // This removes decimal values
+                    }
+                }]
+            }
+        }
+    });
+}
+
+
+
+
 
     // Event handler for input change in search box
     handleInputChange(event) {
@@ -50,15 +125,12 @@ export default class Property extends LightningElement {
         this.search();
     }
 
-    // Clears search filters
+    // Clear all filters
     clearFilter() {
         this.searchTerm = '';
-        this.selectedFilters = {
-            Small: false,
-            Medium: false,
-            Large: false
-        };
-        this.search();
+        this.selectedFilters = { Small: false, Medium: false, Large: false };
+        this.priceRange = this.maxPrice; // Set price range to maximum
+        this.search(); // Perform the search with cleared filters and updated price range
     }
 
     // Initiates search
@@ -66,14 +138,14 @@ export default class Property extends LightningElement {
         this.search();
     }
 
-    // Executes property search
     search() {
         this.loading = true;
         const filters = Object.keys(this.selectedFilters).filter(key => this.selectedFilters[key]);
-        searchPropertyItems({ searchKeywords: this.searchTerm, filters: filters })
+        searchPropertyItems({ searchKeywords: this.searchTerm, filters: filters, priceRange: this.priceRange })
             .then(result => {
                 this.propertyItems = result;
                 this.error = undefined;
+                this.updatePropertyTypeChart();
             })
             .catch(error => {
                 this.error = error;
@@ -82,6 +154,30 @@ export default class Property extends LightningElement {
             .finally(() => {
                 this.loading = false;
             });
+    }
+
+    // Updates the property type chart
+    updatePropertyTypeChart() {
+        let propertyTypeCounts = {
+            Small: 0,
+            Medium: 0,
+            Large: 0
+        };
+
+        if (this.propertyItems) {
+            this.propertyItems.forEach(property => {
+                propertyTypeCounts[property.PropertyType__c]++;
+            });
+        }
+
+        this.chart.data.labels = Object.keys(propertyTypeCounts);
+        this.chart.data.datasets[0].data = Object.values(propertyTypeCounts);
+        this.chart.update();
+    }
+
+    handlePriceChange(event) {
+        this.priceRange = event.target.value;
+        this.search();
     }
 
     // Event handler to add a new property
@@ -141,6 +237,7 @@ export default class Property extends LightningElement {
     // Event handler for delete modal close
     handleDeleteModalClose() {
         this.showDeleteModal = false;
+        this.showDeleteModal = false;
         this.currentPropertyId = null;
     }
 
@@ -171,3 +268,4 @@ export default class Property extends LightningElement {
         return this.isEditing ? 'Save' : 'Add';
     }
 }
+
